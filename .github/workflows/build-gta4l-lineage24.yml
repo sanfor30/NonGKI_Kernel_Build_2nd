@@ -9,10 +9,11 @@ env:
   DEVICE_NAME : "samsung_gta4l"
   DEVICE_CODENAME : "gta4l"
 
-  # ضبط المترجم ليعتمد على المترجم القديم والمتوافق تماماً مع النواة القديمة
-  CUSTOM_CMDS : "CC=aarch64-linux-gnu-gcc CROSS_COMPILE=aarch64-linux-gnu-"
+  # ضبط المترجم
+  CUSTOM_CMDS : "CROSS_COMPILE=aarch64-linux-gnu-"
   EXTRA_CMDS : ""
 
+  # المستودع النظيف الأساسي لمعالج SM6115
   KERNEL_SOURCE : "https://github.com/sanfor30/android_kernel_samsung_sm6115"
   KERNEL_BRANCH : "lineage-24.0"
 
@@ -30,11 +31,13 @@ env:
   DEFCONFIG_ORIGIN_IMAGE: ""
   DEFCONFIG_FROM_BOOT: false
 
-  KERNELSU_SOURCE : ""
-  KERNELSU_BRANCH : ""
+  # إعدادات دمج KernelSU Next تلقائياً
+  KERNELSU_SOURCE : "https://github.com/rifsxd/KernelSU-Next"
+  KERNELSU_BRANCH : "next"
 
   KERNELSU_AUTO_GET : "true"
   KERNELSU_AUTO_FORK : "next"
+  KERNELSU_METHOD: "kprobe"
 
   SUSFS_ENABLE : false
   SUSFS_FIXED : false
@@ -54,17 +57,15 @@ env:
   PACK_METHOD: "AnyKernel3"
   PACK_KMODULES: "false"
 
-  KERNELSU_METHOD: "shell"
-
   PATCHES_SOURCE: "JackA1ltman/NonGKI_Kernel_Patches"
   PATCHES_BRANCH: "mainline"
 
   SUSFS_FOLDER_FIXED: ""
   SUSFS_PATCH_FIXED: ""
 
-  REKERNEL_ENABLE: "true"
-  DROIDSPACES_ENABLE: "true"
-  NOMOUNT_ENABLE: "true"
+  REKERNEL_ENABLE: "false"
+  DROIDSPACES_ENABLE: "false"
+  NOMOUNT_ENABLE: "false"
 
   HOOK_METHOD: "syscall"
 
@@ -73,9 +74,9 @@ env:
   KPM_ENABLE: "false"
   KPM_INLINE: "false"
   KPM_KPATCH_NEXT: "false"
-  KPM_PATCH_SOURCE: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux"
+  KPM_PATCH_SOURCE: ""
 
-  BASEBAND_GUARD_ENABLE: "true"
+  BASEBAND_GUARD_ENABLE: "false"
   BASEBAND_GUARD_BOOT: "false"
 
   GENERATE_DTB: "true"
@@ -97,6 +98,8 @@ jobs:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
       CCACHE_HARDLINK: "true"
+      KCFLAGS: "-Wno-error"
+      KAFLAGS: "-Wno-error"
 
     steps:
       - name: ⏰ Checkout repository
@@ -113,12 +116,6 @@ jobs:
       - name: ⚙️ Get necessary tools
         uses: ./.github/workflows/build-ready
 
-      - name: 🪝 Patch Kernel of SUSFS
-        uses: ./.github/workflows/patch-susfs
-
-      - name: 🔗 Patch for no-kprobe
-        uses: ./.github/workflows/patch-no-kprobe
-
       - name: 🪛 Extra Kernel & Performance Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
@@ -127,38 +124,19 @@ jobs:
           sed -i 's/CONFIG_LOCALVERSION="-Paradigm"/CONFIG_LOCALVERSION="-ENIGMA"/g' arch/arm64/configs/gta4l_eur_open_defconfig
           echo "[+] Kernel name updated to -ENIGMA"
           
-          # 2. إضافة التعديلات، الشبكة، التوافق، وضغط وتحسينات الأداء
+          # 2. تفعيل دعم Kprobes الإلزامي لـ KernelSU والتحسينات الأساسية
           cat <<EOF >> arch/arm64/configs/gta4l_eur_open_defconfig
-          # تفعيل دعم التوافق مع 32-بت
+          CONFIG_KPROBES=y
+          CONFIG_HAVE_KPROBES=y
+          CONFIG_KRETPROBES=y
           CONFIG_COMPAT=y
-
-          # Network Performance (BBR & FQ_CODEL)
           CONFIG_TCP_CONG_BBR=y
           CONFIG_NET_SCH_FQ_CODEL=y
           CONFIG_DEFAULT_TCP_CONG="bbr"
           CONFIG_DEFAULT_NET_SCH="fq_codel"
-
-          # Wireguard VPN support
           CONFIG_WIREGUARD=y
-
-          # Performance & Storage Tweaks (LZ4 Compression & BFQ I/O Scheduler)
-          CONFIG_KERNEL_LZ4=y
-          CONFIG_IOSCHED_BFQ=y
-          CONFIG_DEFAULT_IOSCHED="bfq"
           EOF
-          echo "[+] Performance, Network & Compatibility tweaks added successfully"
-
-      - name: 🧰 Patch Kernel of Re:Kernel
-        uses: ./.github/workflows/patch-rekernel
-
-      - name: 💿 Patch Kernel of Droidspaces
-        uses: ./.github/workflows/patch-droidspaces
-
-      - name: 🔒 Patch Kernel of Baseband Guard
-        uses: ./.github/workflows/patch-baseband-guard
-
-      - name: 🛡️ Patch Kernel of NoMount
-        uses: ./.github/workflows/patch-nomount
+          echo "[+] Kprobes and tweaks added successfully"
 
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
