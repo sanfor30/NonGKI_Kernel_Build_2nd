@@ -15,7 +15,7 @@ env:
   KERNEL_SOURCE : "https://github.com/sanfor30/android_kernel_samsung_sm6115"
   KERNEL_BRANCH : "lineage-24.0"
 
-  CLANG_SOURCE : "https://github.com/nduykha/kernel_samsung_sm7150/releases/download/clang/llvm.tar.xz"
+  CLANG_SOURCE : ""
   CLANG_BRANCH : ""
 
   GCC_GNU : true
@@ -61,8 +61,8 @@ env:
   SUSFS_FOLDER_FIXED: ""
   SUSFS_PATCH_FIXED: ""
 
-  REKERNEL_ENABLE: "false"
-  DROIDSPACES_ENABLE: "false"
+  REKERNEL_ENABLE: "true"
+  DROIDSPACES_ENABLE: "true"
   NOMOUNT_ENABLE: "true"
 
   HOOK_METHOD: "syscall"
@@ -101,6 +101,11 @@ jobs:
       - name: ⏰ Checkout repository
         uses: actions/checkout@v6
 
+      - name: 🚀 Configure Fast APT Mirror
+        uses: vegardit/fast-apt-mirror.sh@v1
+        with:
+          exclude-current: true
+
       - name: ⌛️ Compilation environment preparation
         uses: ./.github/workflows/build-env
 
@@ -113,18 +118,34 @@ jobs:
       - name: 🔗 Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
 
+      # قسم التعديلات المخصصة (اسم النواة + تحسينات الشبكة + Wireguard)
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
-          sed -i 's/CONFIG_LOCALVERSION="-HaoticKernel"/CONFIG_LOCALVERSION="-ENIGMA"/g' arch/arm64/configs/gta4l_eur_open_defconfig
-          echo "[+] Kernel name has been updated to -ENIGMA"
+          
+          # 1. تعديل اسم النواة
+          sed -i 's/CONFIG_LOCALVERSION="-Paradigm"/CONFIG_LOCALVERSION="-ENIGMA"/g' arch/arm64/configs/gta4l_eur_open_defconfig
+          echo "[+] Kernel name updated to -ENIGMA"
+          
+          # 2. تعطيل ملفات الـ Debug لتقليل الحجم
           sed -i -e '/CONFIG_DEBUG_KERNEL/d' -e '/CONFIG_KALLSYMS/d' -e '/CONFIG_KALLSYMS_ALL/d' arch/arm64/configs/gta4l_eur_open_defconfig
+          
+          # 3. إضافة تحسينات الشبكة و Wireguard
           cat <<EOF >> arch/arm64/configs/gta4l_eur_open_defconfig
-          CONFIG_DEBUG_KERNEL=y
-          CONFIG_KALLSYMS=y
-          CONFIG_KALLSYMS_ALL=y
+          CONFIG_DEBUG_KERNEL=n
+          CONFIG_KALLSYMS=n
+          CONFIG_KALLSYMS_ALL=n
+          
+          # Network Performance (BBR & FQ_CODEL)
+          CONFIG_TCP_CONG_BBR=y
+          CONFIG_NET_SCH_FQ_CODEL=y
+          CONFIG_DEFAULT_TCP_CONG="bbr"
+          CONFIG_DEFAULT_NET_SCH="fq_codel"
+          
+          # Wireguard VPN support
+          CONFIG_WIREGUARD=y
           EOF
-          echo "[+] Fixed KPM feature"
+          echo "[+] Network tweaks & Wireguard enabled"
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
