@@ -1,4 +1,4 @@
-name: Build Samsung Tab A7 (LineageOS 24 Balanced)
+name: Build Samsung Tab A7 (LineageOS 24)
 
 on:
   workflow_call:
@@ -9,12 +9,11 @@ env:
   DEVICE_NAME : "samsung_gta4l"
   DEVICE_CODENAME : "gta4l"
 
-  # ضبط المترجم
-  CUSTOM_CMDS : "CROSS_COMPILE=aarch64-linux-gnu-"
-  EXTRA_CMDS : ""
+  CUSTOM_CMDS : "CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu-"
+  EXTRA_CMDS : "LLVM=1 LLVM_IAS=1 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip READELF=llvm-readelf HOSTCC=clang HOSTCXX=clang++"
 
-  # المستودع النظيف الأساسي لمعالج SM6115
-  KERNEL_SOURCE : "https://github.com/sanfor30/android_kernel_samsung_sm6115"
+  # النواة الرسمية لـ LineageOS 24
+  KERNEL_SOURCE : "https://github.com/LineageOS/android_kernel_samsung_sm6115"
   KERNEL_BRANCH : "lineage-24.0"
 
   CLANG_SOURCE : ""
@@ -31,74 +30,67 @@ env:
   DEFCONFIG_ORIGIN_IMAGE: ""
   DEFCONFIG_FROM_BOOT: false
 
-  # تعطيل KernelSU تماماً لاعتماد APatch الخارجي
+  # إعدادات KernelSU-Next
   KERNELSU_SOURCE : ""
   KERNELSU_BRANCH : ""
-  KERNELSU_AUTO_GET : "false"
-  KERNEL_PATCH: "false"
+  KERNELSU_AUTO_GET : "true"
+  KERNELSU_AUTO_FORK : "next"
 
-  SUSFS_ENABLE : false
-  SUSFS_FIXED : false
+  # إعدادات SUSFS
+  SUSFS_ENABLE : "true"
+  SUSFS_FIXED : "false"
 
-  # تفعيل AnyKernel3 لتجنب أخطاء البحث في السكربتات الداخلية للمستودع
   AK3_SOURCE : "https://github.com/osm0sis/AnyKernel3.git"
   AK3_BRANCH : "master"
 
   BOOT_SOURCE : ""
-
   NEED_DTBO : false
   NEED_SAFE_DTBO : false
 
-  ROM_TEXT : "lineageos24_balanced"
-
+  ROM_TEXT : "lineageos24_a17"
   PYTHON_VERSION: "3"
-
   PACK_METHOD: "AnyKernel3"
   PACK_KMODULES: "false"
+  KERNELSU_METHOD: "shell"
 
   PATCHES_SOURCE: "JackA1ltman/NonGKI_Kernel_Patches"
   PATCHES_BRANCH: "mainline"
-
   SUSFS_FOLDER_FIXED: ""
   SUSFS_PATCH_FIXED: ""
 
+  # تعطيل الباتشات التي تسبب أخطاء
   REKERNEL_ENABLE: "false"
   DROIDSPACES_ENABLE: "false"
   NOMOUNT_ENABLE: "false"
+  BASEBAND_GUARD_ENABLE: "false"
 
+  HOOK_METHOD: "syscall"
+  KERNEL_PATCH: "false"
   KPM_ENABLE: "false"
   KPM_INLINE: "false"
   KPM_KPATCH_NEXT: "false"
-  KPM_PATCH_SOURCE: ""
-
-  BASEBAND_GUARD_ENABLE: "false"
-  BASEBAND_GUARD_BOOT: "false"
+  KPM_PATCH_SOURCE: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux"
 
   GENERATE_DTB: "true"
   GENERATE_CHIP: "qcom"
-
   BUILD_DEBUGGER: "false"
   SKIP_PATCH: "false"
-
   BUILD_OTHER_CONFIG: "false"
   MERGE_CONFIG_FILES: ""
-
   FREE_MORE_SPACE: "true"
 
 jobs:
   build-kernel:
-    name: Samsung Tab A7 (LineageOS 24 Balanced)
+    name: Build Kernel (LineageOS 24)
     runs-on: ubuntu-24.04
     env:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
       CCACHE_HARDLINK: "true"
-      KCFLAGS: "-Wno-error"
-      KAFLAGS: "-Wno-error"
 
     steps:
       - name: ⏰ Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: 🚀 Configure Fast APT Mirror
         uses: vegardit/fast-apt-mirror.sh@v1
@@ -108,57 +100,47 @@ jobs:
       - name: ⌛️ Compilation environment preparation
         uses: ./.github/workflows/build-env
 
-      - name: 🛠️ Create Dummy KernelSU Folder to Satisfy Scripts
-        run: |
-          mkdir -p device_kernel/drivers/kernelsu
-          touch device_kernel/drivers/kernelsu/Kconfig
-          echo "[+] Dummy KernelSU directory created successfully"
-
       - name: ⚙️ Get necessary tools
         uses: ./.github/workflows/build-ready
 
-      - name: 🪛 Inject Full OverlayFS, Kprobes & Advanced Tweaks
+      - name: 🪝 Patch Kernel of SUSFS
+        uses: ./.github/workflows/patch-susfs
+
+      - name: 🔗 Patch for no-kprobe
+        uses: ./.github/workflows/patch-no-kprobe
+
+      # التعديلات المخصصة لتفعيل الخيارات
+      - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
-          # 1. تعديل اسم النواة لتمييزها
-          sed -i 's/CONFIG_LOCALVERSION="-Paradigm"/CONFIG_LOCALVERSION="-ENIGMA-BALANCED"/g' arch/arm64/configs/gta4l_eur_open_defconfig
-          echo "[+] Kernel name updated to -ENIGMA-BALANCED"
+          # تعديل اسم النواة
+          sed -i 's/CONFIG_LOCALVERSION="-Paradigm"/CONFIG_LOCALVERSION="-CUSTOM"/g' arch/arm64/configs/gta4l_eur_open_defconfig || true
           
-          # 2. حقن كافة المزايا والخيارات المطلوبة دفعة واحدة
+          # إضافة الخيارات الأساسية
           cat <<EOF >> arch/arm64/configs/gta4l_eur_open_defconfig
-          # OverlayFS Complete Options for Hybrid Mount
+          # 1. تفعيل دعم 32-بت (مهم جداً لمنع أخطاء الترجمة)
+          CONFIG_COMPAT=y
+          
+          # 2. تفعيل OverlayFS المتقدم (لأدوات الروت وحذف التطبيقات)
           CONFIG_OVERLAY_FS=y
           CONFIG_OVERLAY_FS_REDIRECT_DIR=y
           CONFIG_OVERLAY_FS_INDEX=y
           CONFIG_OVERLAY_FS_METACOPY=y
-          CONFIG_OVERLAY_FS_REDIRECT_ALWAYS_FOLLOW=y
-
-          # Kprobes & APatch Support
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KRETPROBES=y
-          CONFIG_COMPAT=y
-
-          # TCP BBR & Network Optimizations
+          
+          # 3. تفعيل KernelSU (مدمج)
+          CONFIG_KSU=y
+          
+          # 4. تحسينات الشبكة (سرعة وتقليل التقطيع)
           CONFIG_TCP_CONG_BBR=y
           CONFIG_NET_SCH_FQ_CODEL=y
           CONFIG_DEFAULT_TCP_CONG="bbr"
           CONFIG_DEFAULT_NET_SCH="fq_codel"
+          
+          # 5. دعم WireGuard VPN
           CONFIG_WIREGUARD=y
-
-          # USB Serial Drivers Support
-          CONFIG_USB_SERIAL=y
-          CONFIG_USB_SERIAL_GENERIC=y
-          CONFIG_USB_SERIAL_CH341=y
-          CONFIG_USB_SERIAL_CP210X=y
-          CONFIG_USB_SERIAL_FTDI_SIO=y
-
-          # TTL Mangling
-          CONFIG_NETFILTER_XT_TARGET_HL=y
-          CONFIG_IP6_NF_TARGET_HL=y
           EOF
-          echo "[+] All advanced kernel features injected successfully"
+          echo "[+] Kernel options injected successfully."
 
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
@@ -166,7 +148,6 @@ jobs:
       - name: 🔩 Pack Process
         run: |
           TIME=$(date +"%Y%m%d%H%M%S")
-
           cd $GITHUB_WORKSPACE/device_kernel/
           if [[ -d "arch/arm64/configs" ]]; then
             IMAGE_DIR="$GITHUB_WORKSPACE/device_kernel/out/arch/arm64/boot"
@@ -177,11 +158,10 @@ jobs:
           mkdir -p tmp
 
           if [[ "${{ env.AK3_SOURCE }}" =~ "osm0sis" ]]; then
-            sed -i 's|ExampleKernel by osm0sis @ xda-developers|NonGKI Kernel Build by JackAltman @ GitHub|g' AnyKernel3/anykernel.sh
+            sed -i 's|ExampleKernel by osm0sis @ xda-developers|Custom Build by User @ GitHub|g' AnyKernel3/anykernel.sh
             sed -i 's/do.devicecheck=1/do.devicecheck=0/g' AnyKernel3/anykernel.sh
             sed -i 's!BLOCK=/dev/block/platform/omap/omap_hsmmc.0/by-name/boot;!BLOCK=auto;!g' AnyKernel3/anykernel.sh
             sed -i 's/IS_SLOT_DEVICE=0;/is_slot_device=auto;/g' AnyKernel3/anykernel.sh
-            echo "Now using official AnyKernel3."
           fi
 
           if [[ -f "$IMAGE_DIR/Image.gz-dtb" ]]; then
@@ -213,7 +193,6 @@ jobs:
 
           cp -fp tmp/tmp.zip ${{ env.DEVICE_CODENAME }}-${{ env.ROM_TEXT }}-$TIME-${{ env.PACK_METHOD }}.zip
           rm -rf tmp
-
           echo "PACK_NAME=${{ env.DEVICE_CODENAME }}-${{ env.ROM_TEXT }}-$TIME-${{ env.PACK_METHOD }}.zip" >> $GITHUB_ENV
 
       - name: ✏️ Upload Artifacts
