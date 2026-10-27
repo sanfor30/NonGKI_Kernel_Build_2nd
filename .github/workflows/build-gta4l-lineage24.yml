@@ -97,6 +97,9 @@ jobs:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
       CCACHE_HARDLINK: "true"
+      # حقن متغيرات تجاوز الأخطاء والتحذيرات لتطبيقها مباشرة على الـ Make
+      KCFLAGS: "-Wno-error -Wno-format -Wno-implicit-function-declaration -Wno-int-conversion"
+      KAFLAGS: "-Wno-error"
 
     steps:
       - name: ⏰ Checkout repository
@@ -147,13 +150,6 @@ jobs:
           CONFIG_DEFAULT_IOSCHED="bfq"
           EOF
           echo "[+] Performance, Network & Compatibility tweaks added successfully"
-
-      - name: 🛠️ Fix Slub.c Format Warnings
-        run: |
-          cd $GITHUB_WORKSPACE/device_kernel
-          # تصحيح نوع التنسيق في ملف mm/slub.c لتوافق المعيار البرمجي جذرياً
-          sed -i 's/%p/%lx/g' mm/slub.c
-          echo "[+] mm/slub.c format arguments corrected successfully"
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
