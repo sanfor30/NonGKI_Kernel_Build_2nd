@@ -108,6 +108,12 @@ jobs:
       - name: ⌛️ Compilation environment preparation
         uses: ./.github/workflows/build-env
 
+      - name: 🛠️ Create Dummy KernelSU Folder to Satisfy Scripts
+        run: |
+          mkdir -p device_kernel/drivers/kernelsu
+          touch device_kernel/drivers/kernelsu/Kconfig
+          echo "[+] Dummy KernelSU directory created successfully"
+
       - name: ⚙️ Get necessary tools
         uses: ./.github/workflows/build-ready
 
