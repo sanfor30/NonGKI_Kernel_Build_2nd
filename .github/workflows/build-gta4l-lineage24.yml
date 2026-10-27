@@ -9,8 +9,8 @@ env:
   DEVICE_NAME : "samsung_gta4l"
   DEVICE_CODENAME : "gta4l"
 
-  # ضبط المترجم ليعتمد على GCC فقط وتجنب تضارب Clang مع نواة Non-GKI
-  CUSTOM_CMDS : "CROSS_COMPILE=aarch64-linux-gnu-"
+  # ضبط المترجم ليعتمد على المترجم القديم والمتوافق تماماً مع النواة القديمة
+  CUSTOM_CMDS : "CC=aarch64-linux-gnu-gcc CROSS_COMPILE=aarch64-linux-gnu-"
   EXTRA_CMDS : ""
 
   KERNEL_SOURCE : "https://github.com/sanfor30/android_kernel_samsung_sm6115"
@@ -97,9 +97,6 @@ jobs:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
       CCACHE_HARDLINK: "true"
-      # حقن متغيرات تجاوز الأخطاء والتحذيرات لتطبيقها مباشرة على الـ Make
-      KCFLAGS: "-Wno-error -Wno-format -Wno-implicit-function-declaration -Wno-int-conversion"
-      KAFLAGS: "-Wno-error"
 
     steps:
       - name: ⏰ Checkout repository
