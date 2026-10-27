@@ -118,7 +118,7 @@ jobs:
       - name: 🔗 Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
 
-      # قسم التعديلات المخصصة (اسم النواة + تحسينات الشبكة + Wireguard)
+      # قسم التعديلات المخصصة (اسم النواة + تحسينات الشبكة + Wireguard + دعم 32-بت)
       - name: 🪛 Extra Kernel Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
@@ -130,22 +130,25 @@ jobs:
           # 2. تعطيل ملفات الـ Debug لتقليل الحجم
           sed -i -e '/CONFIG_DEBUG_KERNEL/d' -e '/CONFIG_KALLSYMS/d' -e '/CONFIG_KALLSYMS_ALL/d' arch/arm64/configs/gta4l_eur_open_defconfig
           
-          # 3. إضافة تحسينات الشبكة و Wireguard
+          # 3. إضافة تحسينات الشبكة و Wireguard وتفعيل دعم 32-بت
           cat <<EOF >> arch/arm64/configs/gta4l_eur_open_defconfig
           CONFIG_DEBUG_KERNEL=n
           CONFIG_KALLSYMS=n
           CONFIG_KALLSYMS_ALL=n
-          
+
+          # تفعيل دعم التوافق مع 32-بت (لحل خطأ compat_uptr_t)
+          CONFIG_COMPAT=y
+
           # Network Performance (BBR & FQ_CODEL)
           CONFIG_TCP_CONG_BBR=y
           CONFIG_NET_SCH_FQ_CODEL=y
           CONFIG_DEFAULT_TCP_CONG="bbr"
           CONFIG_DEFAULT_NET_SCH="fq_codel"
-          
+
           # Wireguard VPN support
           CONFIG_WIREGUARD=y
           EOF
-          echo "[+] Network tweaks & Wireguard enabled"
+          echo "[+] Network tweaks, Wireguard & CONFIG_COMPAT enabled"
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
