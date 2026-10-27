@@ -163,7 +163,7 @@ jobs:
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
         with:
-          extra_cflags: "-Wno-error -Wno-implicit-function-declaration -Wno-int-conversion"
+          extra_cflags: "-Wno-error -Wno-implicit-function-declaration -Wno-int-conversion -Wno-format"
 
       - name: 🔩 Pack Process
         run: |
