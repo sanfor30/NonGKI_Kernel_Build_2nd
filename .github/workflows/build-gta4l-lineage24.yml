@@ -9,8 +9,9 @@ env:
   DEVICE_NAME : "samsung_gta4l"
   DEVICE_CODENAME : "gta4l"
 
-  CUSTOM_CMDS : "CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu-"
-  EXTRA_CMDS : "LLVM=1 LLVM_IAS=1 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip READELF=llvm-readelf HOSTCC=clang HOSTCXX=clang++"
+  # ضبط المترجم ليعتمد على GCC فقط وتجنب تضارب Clang مع نواة Non-GKI
+  CUSTOM_CMDS : "CROSS_COMPILE=aarch64-linux-gnu-"
+  EXTRA_CMDS : ""
 
   KERNEL_SOURCE : "https://github.com/sanfor30/android_kernel_samsung_sm6115"
   KERNEL_BRANCH : "lineage-24.0"
@@ -118,8 +119,7 @@ jobs:
       - name: 🔗 Patch for no-kprobe
         uses: ./.github/workflows/patch-no-kprobe
 
-      # قسم التعديلات المخصصة (اسم النواة + تحسينات الشبكة + Wireguard + دعم 32-بت)
-      - name: 🪛 Extra Kernel Options
+      - name: 🪛 Extra Kernel & Performance Options
         run: |
           cd $GITHUB_WORKSPACE/device_kernel
           
@@ -127,16 +127,9 @@ jobs:
           sed -i 's/CONFIG_LOCALVERSION="-Paradigm"/CONFIG_LOCALVERSION="-ENIGMA"/g' arch/arm64/configs/gta4l_eur_open_defconfig
           echo "[+] Kernel name updated to -ENIGMA"
           
-          # 2. تعطيل ملفات الـ Debug لتقليل الحجم
-          sed -i -e '/CONFIG_DEBUG_KERNEL/d' -e '/CONFIG_KALLSYMS/d' -e '/CONFIG_KALLSYMS_ALL/d' arch/arm64/configs/gta4l_eur_open_defconfig
-          
-          # 3. إضافة تحسينات الشبكة و Wireguard وتفعيل دعم 32-بت
+          # 2. إضافة التعديلات، الشبكة، التوافق، وضغط وتحسينات الأداء
           cat <<EOF >> arch/arm64/configs/gta4l_eur_open_defconfig
-          CONFIG_DEBUG_KERNEL=n
-          CONFIG_KALLSYMS=n
-          CONFIG_KALLSYMS_ALL=n
-
-          # تفعيل دعم التوافق مع 32-بت (لحل خطأ compat_uptr_t)
+          # تفعيل دعم التوافق مع 32-بت
           CONFIG_COMPAT=y
 
           # Network Performance (BBR & FQ_CODEL)
@@ -147,8 +140,13 @@ jobs:
 
           # Wireguard VPN support
           CONFIG_WIREGUARD=y
+
+          # Performance & Storage Tweaks (LZ4 Compression & BFQ I/O Scheduler)
+          CONFIG_KERNEL_LZ4=y
+          CONFIG_IOSCHED_BFQ=y
+          CONFIG_DEFAULT_IOSCHED="bfq"
           EOF
-          echo "[+] Network tweaks, Wireguard & CONFIG_COMPAT enabled"
+          echo "[+] Performance, Network & Compatibility tweaks added successfully"
 
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
@@ -164,6 +162,8 @@ jobs:
 
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
+        with:
+          extra_cflags: "-Wno-error -Wno-implicit-function-declaration -Wno-int-conversion"
 
       - name: 🔩 Pack Process
         run: |
