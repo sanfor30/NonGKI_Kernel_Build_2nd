@@ -148,6 +148,13 @@ jobs:
           EOF
           echo "[+] Performance, Network & Compatibility tweaks added successfully"
 
+      - name: 🛠️ Fix Slub.c Format Warnings
+        run: |
+          cd $GITHUB_WORKSPACE/device_kernel
+          # تصحيح نوع التنسيق في ملف mm/slub.c لتوافق المعيار البرمجي جذرياً
+          sed -i 's/%p/%lx/g' mm/slub.c
+          echo "[+] mm/slub.c format arguments corrected successfully"
+
       - name: 🧰 Patch Kernel of Re:Kernel
         uses: ./.github/workflows/patch-rekernel
 
@@ -162,8 +169,6 @@ jobs:
 
       - name: 🚀 Build Process
         uses: ./.github/workflows/build-process
-        with:
-          extra_cflags: "-Wno-error -Wno-implicit-function-declaration -Wno-int-conversion -Wno-format"
 
       - name: 🔩 Pack Process
         run: |
