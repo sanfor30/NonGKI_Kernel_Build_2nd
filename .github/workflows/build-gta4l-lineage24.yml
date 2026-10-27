@@ -31,13 +31,16 @@ env:
   DEFCONFIG_ORIGIN_IMAGE: ""
   DEFCONFIG_FROM_BOOT: false
 
-  # إعدادات دمج KernelSU Next تلقائياً
+  # إعدادات دمج KernelSU Next وتفعيل الحقن التلقائي
   KERNELSU_SOURCE : "https://github.com/rifsxd/KernelSU-Next"
   KERNELSU_BRANCH : "next"
 
   KERNELSU_AUTO_GET : "true"
   KERNELSU_AUTO_FORK : "next"
   KERNELSU_METHOD: "kprobe"
+  HOOK_METHOD: "kprobe"
+
+  KERNEL_PATCH: "true"
 
   SUSFS_ENABLE : false
   SUSFS_FIXED : false
@@ -66,10 +69,6 @@ env:
   REKERNEL_ENABLE: "false"
   DROIDSPACES_ENABLE: "false"
   NOMOUNT_ENABLE: "false"
-
-  HOOK_METHOD: "syscall"
-
-  KERNEL_PATCH: "false"
 
   KPM_ENABLE: "false"
   KPM_INLINE: "false"
